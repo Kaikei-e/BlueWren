@@ -1,0 +1,54 @@
+[package]
+name = "bluewren"
+version = "0.2.0"
+edition = "2021"
+description = "実験的暗号化P2Pテキストチャット (1対1, 短時間, 帯域外チケット交換)"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = ""
+
+[dependencies]
+# Iroh: QUIC ベースの P2P ネットワーキングフレームワーク
+# 0.97 系で API が大幅刷新 (NodeId→EndpointId, NodeAddr→EndpointAddr)
+iroh = "0.98.2"
+
+# Iroh のチケット型は 0.94 で iroh-base から分離された
+# (iroh-tickets 0.5.x は iroh-base ^0.98 と互換)
+iroh-tickets = "0.5"
+
+# tokio: 非同期ランタイム
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "io-util", "signal", "time"] }
+
+# anyhow: エラーハンドリング
+anyhow = "1"
+
+# clap: CLI 引数パーサ
+clap = { version = "4", features = ["derive"] }
+
+# tracing / tracing-subscriber: 構造化ログ
+# デフォルトレベルは WARN にし、メタデータ漏洩を抑制する
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# rand: パディング・nonce・鍵生成に使用
+rand = "0.8"
+
+# zeroize: メモリ上の秘密値を Drop 時にゼロ化する
+zeroize = { version = "1.7", features = ["derive"] }
+
+# secrecy: 秘密値ラッパ (Debug 経由の漏洩を防ぐ)
+secrecy = "0.10"
+
+# blake3: SAS 計算 (高速かつ安全なハッシュ)
+blake3 = "1.5"
+
+[dev-dependencies]
+# 単体テストでメモリ上の双方向ストリームを擬似する
+tokio = { version = "1", features = ["macros", "rt", "io-util"] }
+
+[profile.release]
+# 注意: 以下は補助策であり、セキュリティの主要防御ではない (監査 F-12 参照)
+strip = true          # シンボル情報を削除し、バイナリサイズと逆解析容易性を低減
+lto = true            # Link-Time Optimization で実行ファイル縮小
+codegen-units = 1     # 単一コードジェン単位で最適化を最大化
+panic = "abort"       # パニック時にスタックを展開せず即座に abort

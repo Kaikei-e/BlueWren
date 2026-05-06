@@ -1,0 +1,10 @@
+/target
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/
+.claude/
+
+# Cargo.lock はコミットする (CLI バイナリのため)
+# !Cargo.lock

@@ -1,0 +1,46 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # 毎日 02:00 UTC (= JST 11:00) に脆弱性検査を実行
+    # 新規 advisory が公開された日のうちに気づくため
+    - cron: "0 2 * * *"
+
+jobs:
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+
+  dependency-tree:
+    name: dependency tree (informational)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-tree (built-in)
+        run: cargo --version
+      - name: show quinn-proto version
+        run: cargo tree -i quinn-proto || echo "quinn-proto not in tree"
+      - name: show iroh chain
+        run: cargo tree -p iroh
+      - name: show rustls chain
+        run: cargo tree -i rustls || echo "rustls not in tree"

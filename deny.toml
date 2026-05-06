@@ -1,0 +1,53 @@
+# cargo-deny 設定
+# https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+# RustSec データベースから advisory を取得し、脆弱性をチェックする
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# 脆弱性は deny: 検出されたら CI を fail させる
+vulnerability = "deny"
+unmaintained = "warn"
+yanked = "deny"
+notice = "warn"
+# 既知の例外を明示的に許可する場合はここに ID を追加
+ignore = []
+
+[bans]
+# 同じ crate の複数バージョンが混在することを警告
+multiple-versions = "warn"
+# wildcard 依存 (* 指定) を禁止
+wildcards = "deny"
+# highlights:
+#   * lowest-version-first
+#   * all
+highlight = "all"
+
+[licenses]
+# 不明なライセンスの crate を禁止
+unlicensed = "deny"
+# OSS として一般的かつ商用利用可能なライセンスのみを許可
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "Zlib",
+    "CC0-1.0",
+]
+copyleft = "warn"
+allow-osi-fsf-free = "either"
+default = "deny"
+confidence-threshold = 0.8
+
+[sources]
+# crates.io 以外のレジストリ・git ソースを禁止
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
