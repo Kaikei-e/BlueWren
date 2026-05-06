@@ -10,37 +10,86 @@ on:
     # 新規 advisory が公開された日のうちに気づくため
     - cron: "0 2 * * *"
 
+# デフォルトは最小権限。各ジョブで必要に応じて拡張する。
+permissions:
+  contents: read
+
 jobs:
   audit:
     name: cargo audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # rustsec/audit-check は GitHub Checks API への書き込み権限を要するため、
+      # 権限境界を増やさない目的で直接 cargo-audit を実行する。
+      # ignore リストは deny.toml と同期させること (ADR-0008)。
+      - name: install cargo-audit
+        run: cargo install --locked cargo-audit
+      - name: cargo audit
+        # ADR-0008 方針: vulnerabilities = deny, unmaintained = warn (失敗させない)。
+        # --deny warnings は付けない (transitive な unmaintained で false-positive
+        # が出るのを避け、人手のトリアージに委ねる)。
+        # ignore リストは deny.toml と同期させること。
+        run: |
+          cargo audit \
+            --ignore RUSTSEC-2026-0119 \
+            --ignore RUSTSEC-2026-0120
 
   deny:
     name: cargo deny
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check advisories bans licenses sources
 
   dependency-tree:
-    name: dependency tree (informational)
+    name: dependency tree
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: install cargo-tree (built-in)
-        run: cargo --version
-      - name: show quinn-proto version
-        run: cargo tree -i quinn-proto || echo "quinn-proto not in tree"
+      # ADR-0008: quinn-proto >= 0.11.14 (RUSTSEC-2026-0037 / CVE-2026-31812)。
+      # 注: iroh 0.98 系は QUIC バックエンドを quinn-proto から noq へ移行済みのため、
+      # 通常 quinn-proto は依存ツリーに現れない。本ジョブは「もし再導入された場合に
+      # 古いバージョンに戻らないこと」を保証する fail-safe。不在は許容する。
+      - name: verify quinn-proto pin (if present)
+        run: |
+          set -euo pipefail
+          if ! cargo tree -i quinn-proto --depth 0 > /tmp/qp.txt 2>/dev/null; then
+            echo "quinn-proto is NOT in the dependency tree (iroh 0.98 uses noq instead). Skipping pin check."
+            exit 0
+          fi
+          cat /tmp/qp.txt
+          version=$(head -1 /tmp/qp.txt | awk '{print $2}' | sed 's/^v//')
+          required="0.11.14"
+          smaller=$(printf '%s\n%s\n' "$required" "$version" | sort -V | head -1)
+          if [ "$smaller" != "$required" ]; then
+            echo "::error::quinn-proto $version < $required (RUSTSEC-2026-0037)"
+            exit 1
+          fi
+          echo "OK: quinn-proto $version >= $required"
       - name: show iroh chain
         run: cargo tree -p iroh
+      - name: show noq chain (current QUIC backend)
+        run: cargo tree -i noq || echo "noq not in tree"
       - name: show rustls chain
         run: cargo tree -i rustls || echo "rustls not in tree"
+
+  auditable-build:
+    # ADR-0008: リリースバイナリは cargo-auditable でビルドし、依存ツリー情報を
+    # バイナリ内に埋め込む (配布後の事後監査用)。
+    name: auditable build (release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-auditable
+        run: cargo install --locked cargo-auditable
+      - name: cargo auditable build --release --locked
+        run: cargo auditable build --release --locked --all-features

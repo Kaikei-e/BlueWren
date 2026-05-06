@@ -86,9 +86,7 @@ pub async fn write_frame<W: AsyncWriteExt + Unpin>(
 }
 
 /// フレームを 1 つ読み取る
-pub async fn read_frame<R: AsyncReadExt + Unpin>(
-    stream: &mut R,
-) -> Result<Option<Frame>> {
+pub async fn read_frame<R: AsyncReadExt + Unpin>(stream: &mut R) -> Result<Option<Frame>> {
     let mut frame = [0u8; FRAME_SIZE];
     match stream.read_exact(&mut frame).await {
         Ok(_) => {}
@@ -124,7 +122,9 @@ mod tests {
     #[tokio::test]
     async fn roundtrip_message_frame() {
         let (mut a, mut b) = duplex(1024);
-        write_frame(&mut a, FrameType::Message, b"hello").await.unwrap();
+        write_frame(&mut a, FrameType::Message, b"hello")
+            .await
+            .unwrap();
         let frame = read_frame(&mut b).await.unwrap().unwrap();
         assert_eq!(frame.frame_type, FrameType::Message);
         assert_eq!(frame.payload, b"hello");
@@ -134,7 +134,9 @@ mod tests {
     async fn roundtrip_sas_handshake_frame() {
         let (mut a, mut b) = duplex(1024);
         let nonce = [42u8; 16];
-        write_frame(&mut a, FrameType::SasHandshake, &nonce).await.unwrap();
+        write_frame(&mut a, FrameType::SasHandshake, &nonce)
+            .await
+            .unwrap();
         let frame = read_frame(&mut b).await.unwrap().unwrap();
         assert_eq!(frame.frame_type, FrameType::SasHandshake);
         assert_eq!(frame.payload, nonce);
@@ -144,7 +146,9 @@ mod tests {
     async fn roundtrip_max_size_message() {
         let (mut a, mut b) = duplex(1024);
         let payload = vec![0xAB; MAX_PAYLOAD];
-        write_frame(&mut a, FrameType::Message, &payload).await.unwrap();
+        write_frame(&mut a, FrameType::Message, &payload)
+            .await
+            .unwrap();
         let frame = read_frame(&mut b).await.unwrap().unwrap();
         assert_eq!(frame.payload, payload);
     }
@@ -153,7 +157,9 @@ mod tests {
     async fn rejects_oversized_payload() {
         let (mut a, _b) = duplex(1024);
         let payload = vec![0xAB; MAX_PAYLOAD + 1];
-        assert!(write_frame(&mut a, FrameType::Message, &payload).await.is_err());
+        assert!(write_frame(&mut a, FrameType::Message, &payload)
+            .await
+            .is_err());
     }
 
     #[tokio::test]

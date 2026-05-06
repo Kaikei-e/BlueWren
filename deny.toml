@@ -1,17 +1,30 @@
-# cargo-deny 設定
+# cargo-deny 設定 (cargo-deny 0.16+ / config schema v2)
 # https://embarkstudios.github.io/cargo-deny/
 
 [advisories]
-# RustSec データベースから advisory を取得し、脆弱性をチェックする
+# RustSec データベースから advisory を取得し、脆弱性をチェックする。
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-# 脆弱性は deny: 検出されたら CI を fail させる
-vulnerability = "deny"
-unmaintained = "warn"
+# v2: vulnerability/notice/severity-threshold は廃止。脆弱性は常に deny。
+# unmaintained は scope 列挙: "all" | "workspace" | "transitive" | "none"
+#   workspace = ワークスペース直接依存のみ警告 (transitive な unmaintained は無視)
+unmaintained = "workspace"
 yanked = "deny"
-notice = "warn"
-# 既知の例外を明示的に許可する場合はここに ID を追加
-ignore = []
+# 既知の例外を明示的に許可する。各エントリには ADR / SECURITY.md / 追跡 issue
+# への参照と、解消条件 (例: 上流バージョン) をコメントで残すこと。
+ignore = [
+    # RUSTSEC-2026-0119 (hickory-proto): O(n²) name compression による CPU 枯渇 DoS。
+    # RUSTSEC-2026-0120 (hickory-net): NSEC3 closest-encloser proof の無限ループ DoS。
+    # 修正: hickory-* >= 0.26.1。ただし iroh 0.98.2 が
+    # `hickory-resolver = "=0.26.0-beta.4"` (厳密ピン) を持つため、本プロジェクト
+    # 単独では更新不能。iroh の hickory bump 取り込み (>= 0.99 想定) で解消する。
+    # 影響緩和: BlueWren は untrusted DNS リゾルバを前提としない (ADR-0001 帰結:
+    # IP 匿名化を提供しない = ネットワーク経路をある程度信頼する) ため、
+    # 利用者の DNS が攻撃者制御下にない限り発火しない。
+    # TODO(adr-0008): iroh が新 hickory を取り込み次第 ignore を削除。
+    "RUSTSEC-2026-0119",
+    "RUSTSEC-2026-0120",
+]
 
 [bans]
 # 同じ crate の複数バージョンが混在することを警告
@@ -24,9 +37,9 @@ wildcards = "deny"
 highlight = "all"
 
 [licenses]
-# 不明なライセンスの crate を禁止
-unlicensed = "deny"
-# OSS として一般的かつ商用利用可能なライセンスのみを許可
+# v2: unlicensed/copyleft/allow-osi-fsf-free/default は廃止。
+# allow に列挙されたものだけが許可され、それ以外は自動的に deny される。
+# OSS として一般的かつ商用利用可能なライセンスのみを列挙する。
 allow = [
     "MIT",
     "Apache-2.0",
@@ -34,15 +47,17 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Unicode-DFS-2016",
     "Unicode-3.0",
     "MPL-2.0",
     "Zlib",
     "CC0-1.0",
+    # Unlicense: 公的領域宣言。MIT 同等以上に寛容で OSS 配布の妨げにならない。
+    # 採用 crate 例: ws_stream_wasm, byteorder
+    "Unlicense",
+    # CDLA-Permissive-2.0: OSI 承認の寛容ライセンス。
+    # 採用 crate 例: webpki-roots
+    "CDLA-Permissive-2.0",
 ]
-copyleft = "warn"
-allow-osi-fsf-free = "either"
-default = "deny"
 confidence-threshold = 0.8
 
 [sources]

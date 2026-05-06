@@ -61,8 +61,7 @@ pub fn compute_sas(
     let bytes = hash.as_bytes();
 
     // 上位 24 ビットを読み取り、20 ビットに切り詰める
-    let raw =
-        ((bytes[0] as u32) << 16) | ((bytes[1] as u32) << 8) | (bytes[2] as u32);
+    let raw = ((bytes[0] as u32) << 16) | ((bytes[1] as u32) << 8) | (bytes[2] as u32);
     raw >> (24 - SAS_BITS)
 }
 
